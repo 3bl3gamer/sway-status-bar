@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -10,7 +11,7 @@ import (
 	"syscall"
 )
 
-func ScanCommand(name string, arg ...string) (*exec.Cmd, *bufio.Scanner, error) {
+func ExecCommand(name string, arg ...string) (*exec.Cmd, io.ReadCloser, error) {
 	cmd := exec.Command(name, arg...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Pdeathsig: syscall.SIGTERM, //terminate child with parent
@@ -20,6 +21,14 @@ func ScanCommand(name string, arg ...string) (*exec.Cmd, *bufio.Scanner, error) 
 		return nil, nil, err
 	}
 	if err := cmd.Start(); err != nil {
+		return nil, nil, err
+	}
+	return cmd, out, nil
+}
+
+func ScanCommand(name string, arg ...string) (*exec.Cmd, *bufio.Scanner, error) {
+	cmd, out, err := ExecCommand(name, arg...)
+	if err != nil {
 		return nil, nil, err
 	}
 	return cmd, bufio.NewScanner(out), nil

@@ -9,6 +9,7 @@ import (
 	"sway_status_bar/diskstats"
 	"sway_status_bar/filenum"
 	"sway_status_bar/networks"
+	"sway_status_bar/swaymsg"
 	"sway_status_bar/utils"
 	"sway_status_bar/volume"
 	"time"
@@ -46,11 +47,13 @@ const (
 
 const pangoSubSeparator = "<span color='#AAA'>/</span>"
 const (
-	dimCol     = "#888888"
-	rxCol      = "#77FF77"
-	rxFractCol = "#559955"
-	txCol      = "#FF7777"
-	txFractCol = "#995555"
+	dimCol      = "#888888"
+	rxCol       = "#77FF77"
+	rxFractCol  = "#559955"
+	txCol       = "#FF7777"
+	txFractCol  = "#995555"
+	titleBgCol0 = "#005577"
+	titleBgCol1 = "#007733"
 )
 
 func dim(text string) string {
@@ -66,7 +69,6 @@ const availSpaceUrgentLimit = int64(1024 * 1024 * 1024)
 //   default dev: ip route show to 0.0.0.0/0
 
 // TODO: stop_signal  cont_signal  click_events
-// заголовок окна
 
 func p(text string) {
 	os.Stdout.Write([]byte(text))
@@ -92,6 +94,19 @@ type Daemon interface {
 }
 
 func main() {
+	title := ""
+	layoutIndex := int64(0)
+	onEvent := func(e *swaymsg.Event, onUpdate func()) {
+		if e.Container.Name != "" {
+			title = e.Container.Name
+			onUpdate()
+		}
+		if e.Input.XkbActiveLayoutName != "" {
+			layoutIndex = e.Input.XkbActiveLayoutIndex
+			onUpdate()
+		}
+	}
+
 	cpuTemp := &filenum.FileNumUnit{FPath: cpu_temp_fpath, Denum: 1000}
 	ssdTemp := &filenum.FileNumUnit{FPath: ssd_temp_fpath, Denum: 1000}
 	chipsetTemp := &filenum.FileNumUnit{FPath: chipset_temp_fpath, Denum: 1000}
@@ -102,10 +117,19 @@ func main() {
 			strings.HasPrefix(name, "br-") || strings.HasPrefix(name, "veth")
 	}}
 	diskStat := &diskstats.DiskStatUnit{DevName: "nvme0n1"}
-	units := []Unit{cpuTemp, ssdTemp, chipsetTemp, cpuLoad, volume, nets, diskStat}
+	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
+	units := []Unit{cpuTemp, ssdTemp, chipsetTemp, cpuLoad, volume, nets, diskStat, swayMsg}
 
 	renderBlocks := func() {
-		// pBlock("#FFFFFF", `"i%d"`, iterCount)
+		// pBlock("#FFFFFF", `"i%d %d"`, iterCount, layoutIndex)
+
+		// window title
+		titleBuf, _ := json.Marshal(title)
+		titleBgCol := titleBgCol0
+		if layoutIndex == 1 {
+			titleBgCol = titleBgCol1
+		}
+		p(`{"full_text":` + string(titleBuf) + `, "align":"center", "min_width":800, "background":"` + titleBgCol + `"},`)
 
 		// CPU
 		cpuIsUrgent := false

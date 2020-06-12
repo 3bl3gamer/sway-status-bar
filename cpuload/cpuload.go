@@ -47,7 +47,12 @@ func (u *CpuLoadUnit) Update(iter int64) error {
 		fmt.Fscanf(f, "%d %d %d %d %d %d %d %d %d %d\n",
 			&user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal, &guest, &guestNice)
 		total := user + nice + system + idle + iowait + irq + softirq + steal + guest + guestNice
-		percent := 100 - (idle-u.prevIdle[cpuDataIndex])*100/(total-u.prevTotal[cpuDataIndex])
+
+		percent := int64(0)
+		if total != u.prevTotal[cpuDataIndex] {
+			percent = 100 - (idle-u.prevIdle[cpuDataIndex])*100/(total-u.prevTotal[cpuDataIndex])
+		}
+
 		u.prevTotal[cpuDataIndex] = total
 		u.prevIdle[cpuDataIndex] = idle
 		// fmt.Println(name, total)
