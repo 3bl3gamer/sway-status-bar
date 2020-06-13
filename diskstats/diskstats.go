@@ -23,6 +23,7 @@ func (u *DiskStatUnit) Update(iter int64) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	now := time.Now()
 	timeDelta := int64(now.Sub(u.lastUpdateAt))

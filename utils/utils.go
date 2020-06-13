@@ -2,10 +2,12 @@ package utils
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -32,6 +34,39 @@ func ScanCommand(name string, arg ...string) (*exec.Cmd, *bufio.Scanner, error) 
 		return nil, nil, err
 	}
 	return cmd, bufio.NewScanner(out), nil
+}
+
+func FindHwmonFileByName(pattern, name string) (string, error) {
+	fnames, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", err
+	}
+	foundFName := ""
+	for _, fname := range fnames {
+		buf, err := ioutil.ReadFile(fname + "/name")
+		if err != nil {
+			return "", err
+		}
+		if strings.Trim(string(buf), "\n") == name {
+			if foundFName == "" {
+				foundFName = fname
+			} else {
+				return "", errors.New("found multiple files for " + pattern + " and " + name)
+			}
+		}
+	}
+	if foundFName == "" {
+		return "", errors.New("found no files for " + pattern + " and " + name)
+	}
+	return foundFName + "/temp1_input", nil
+}
+
+func FindHwmonFileByNameSafe(pattern, name string, onError func(error)) string {
+	fpath, err := FindHwmonFileByName(pattern, name)
+	if err != nil {
+		onError(err)
+	}
+	return fpath
 }
 
 func FileReadInt64(fpath string) (int64, error) {

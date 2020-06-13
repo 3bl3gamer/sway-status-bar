@@ -8,6 +8,7 @@ import (
 	"sway_status_bar/cpuload"
 	"sway_status_bar/diskstats"
 	"sway_status_bar/filenum"
+	"sway_status_bar/memory"
 	"sway_status_bar/networks"
 	"sway_status_bar/swaymsg"
 	"sway_status_bar/utils"
@@ -17,9 +18,9 @@ import (
 
 const interval = time.Second
 
-const cpu_temp_fpath = "/sys/devices/platform/coretemp.0/hwmon/hwmon4/temp1_input"                  //name: coretemp
-const ssd_temp_fpath = "/sys/devices/pci0000:00/0000:00:1d.0/0000:04:00.0/hwmon/hwmon1/temp1_input" //name: nvme
-const chipset_temp_fpath = "/sys/devices/virtual/thermal/thermal_zone2/hwmon2/temp1_input"          //name: pch_cannonlake
+var cpuTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/platform/coretemp.0/hwmon/hwmon*", "coretemp", onError)
+var ssdTempFPath = "/sys/devices/pci0000:00/0000:00:1d.0/0000:04:00.0/hwmon/hwmon1/temp1_input" //name: nvme
+var chipsetTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone*/hwmon*", "pch_cannonlake", onError)
 
 const (
 	fiMicrochip          = "\uf2db"
@@ -107,10 +108,11 @@ func main() {
 		}
 	}
 
-	cpuTemp := &filenum.FileNumUnit{FPath: cpu_temp_fpath, Denum: 1000}
-	ssdTemp := &filenum.FileNumUnit{FPath: ssd_temp_fpath, Denum: 1000}
-	chipsetTemp := &filenum.FileNumUnit{FPath: chipset_temp_fpath, Denum: 1000}
+	cpuTemp := &filenum.FileNumUnit{FPath: cpuTempFPath, Denum: 1000}
+	ssdTemp := &filenum.FileNumUnit{FPath: ssdTempFPath, Denum: 1000}
+	chipsetTemp := &filenum.FileNumUnit{FPath: chipsetTempFPath, Denum: 1000}
 	cpuLoad := &cpuload.CpuLoadUnit{}
+	memory := &memory.MemoryUnit{}
 	volume := &volume.VolumeUnit{}
 	nets := &networks.NetworksUnit{SkipFunc: func(name string) bool {
 		return name == "lo" || strings.HasPrefix(name, "docker") ||
@@ -118,7 +120,7 @@ func main() {
 	}}
 	diskStat := &diskstats.DiskStatUnit{DevName: "nvme0n1"}
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
-	units := []Unit{cpuTemp, ssdTemp, chipsetTemp, cpuLoad, volume, nets, diskStat, swayMsg}
+	units := []Unit{cpuTemp, ssdTemp, chipsetTemp, cpuLoad, memory, volume, nets, diskStat, swayMsg}
 
 	renderBlocks := func() {
 		// pBlock("#FFFFFF", `"i%d %d"`, iterCount, layoutIndex)
@@ -146,7 +148,7 @@ func main() {
 			cpuTempCol, cpuTemp.Num, dim("°C"),
 			cpuIsUrgent)
 
-		// Cchipset
+		// Chipset
 		pBlock("#b25d57", `"%d%s"`, chipsetTemp.Num, dim("°C"))
 
 		// storage
@@ -165,7 +167,11 @@ func main() {
 			utils.FmtSizePango(diskStat.WriteSpeed, txCol, txFractCol, dimCol, -3),
 			ssdTemp.Num, dim("°C"))
 
-		// volume
+		// Memory
+		memIsUrgent := memory.Percent >= 98
+		pBlock("#4d79bb", `"%s %d%s", "urgent":%t`, fiMemory, memory.Percent, dim("%"), memIsUrgent)
+
+		// Volume
 		volIcon := fiVolumeMute
 		if !volume.IsMuted {
 			if volume.Volume <= 5 {
@@ -176,9 +182,9 @@ func main() {
 				volIcon = fiVolumeUp
 			}
 		}
-		pBlock("#4d79bb", `"%s %2d%%"`, volIcon, volume.Volume)
+		pBlock("#a3609a", `"%s %2d%%"`, volIcon, volume.Volume)
 
-		// networks
+		// Networks
 		_, hasPpp := nets.NetworkByDevName["ppp0"]
 		for _, net := range nets.ActiveNetworks {
 			if net.DevName != "lo" && (net.DevName != "eno2" || !hasPpp) {
@@ -198,7 +204,7 @@ func main() {
 			}
 		}
 
-		// time
+		// Time
 		p(`{"full_text":"` + time.Now().Format("15:04:05") + `"},`)
 	}
 	render := func() {
@@ -223,10 +229,12 @@ func main() {
 	fmt.Println(`{"version":1}`)
 	fmt.Print(`[`)
 	for {
-		for _, unit := range units {
-			if updater, ok := unit.(Updater); ok {
-				if err := updater.Update(iterCount); err != nil {
-					onError(err)
+		if lastErr == nil {
+			for _, unit := range units {
+				if updater, ok := unit.(Updater); ok {
+					if err := updater.Update(iterCount); err != nil {
+						onError(err)
+					}
 				}
 			}
 		}
