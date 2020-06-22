@@ -8,8 +8,11 @@ import (
 
 type Event struct {
 	Change    string
-	Container struct{ Name string }
-	Input     struct {
+	Container struct {
+		Name    string
+		Focused bool
+	}
+	Input struct {
 		XkbActiveLayoutName  string `json:"xkb_active_layout_name"`
 		XkbActiveLayoutIndex int64  `json:"xkb_active_layout_index"`
 	}

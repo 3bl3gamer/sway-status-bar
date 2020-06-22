@@ -98,7 +98,7 @@ func main() {
 	title := ""
 	layoutIndex := int64(0)
 	onEvent := func(e *swaymsg.Event, onUpdate func()) {
-		if e.Container.Name != "" {
+		if e.Container.Name != "" && e.Container.Focused {
 			title = e.Container.Name
 			onUpdate()
 		}
@@ -186,10 +186,10 @@ func main() {
 
 		// Networks
 		_, hasPpp := nets.NetworkByDevName["ppp0"]
-		for _, net := range nets.ActiveNetworks {
+		for _, net := range nets.Networks {
 			if net.DevName != "lo" && (net.DevName != "eno2" || !hasPpp) {
 				name := net.DevName + ":"
-				if net.DevName == "eth2" {
+				if net.DevName == "eno2" {
 					name = fiEthernet
 				} else if net.DevName == "ppp0" {
 					name = fiNetworkWired
