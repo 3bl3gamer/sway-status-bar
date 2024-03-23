@@ -18,10 +18,12 @@ import (
 
 const interval = time.Second
 
-var cpuTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/pci0000:00/0000:00:18.3/hwmon/hwmon*", "k10temp", onError)
-var ssdTempFPath = "/sys/devices/pci0000:00/0000:00:02.4/0000:05:00.0/nvme/nvme0/hwmon3/temp1_input" //name: nvme
-var chipsetTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone0/hwmon*", "acpitz", onError)
-var batDirPath = "/sys/devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/device:2c/PNP0C09:00/PNP0C0A:00/power_supply/BAT0"
+var cpuTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/platform/coretemp.0/hwmon/hwmon*", "coretemp", onError)
+var ssdTempFPath = utils.FindHwmonFileBySubsysnqnSafe("/sys/devices/pci0000:00/0000:00:06.*/0000:0*:00.0/nvme/nvme*/hwmon*", "kingston", onError)
+
+// var chipsetTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone0/hwmon*", "acpitz", onError)
+// var wifiTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone*/hwmon*", "iwlwifi_1", onError)
+var batDirPath = "/sys/devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/device:08/PNP0C09:01/PNP0C0A:03/power_supply/BAT0"
 
 const (
 	fiMicrochip            = "\uf2db"
@@ -51,6 +53,7 @@ const (
 	fiBatteryQuarter       = "\uf243"
 	fiBatteryEmpty         = "\uf244"
 	fiBolt                 = "\uf0e7"
+	fiMobileScreenButton   = "\uf3cd"
 )
 
 const pangoSubSeparator = "<span color='#AAA'>/</span>"
@@ -117,7 +120,8 @@ func main() {
 
 	cpuTemp := &filenum.FileNumUnit{FPath: cpuTempFPath, Denum: 1000}
 	ssdTemp := &filenum.FileNumUnit{FPath: ssdTempFPath, Denum: 1000}
-	chipsetTemp := &filenum.FileNumUnit{FPath: chipsetTempFPath, Denum: 1000}
+	// chipsetTemp := &filenum.FileNumUnit{FPath: chipsetTempFPath, Denum: 1000}
+	// wifiTemp := &filenum.FileNumUnit{FPath: wifiTempFPath, Denum: 1000}
 	cpuLoad := &cpuload.CpuLoadUnit{}
 	memory := &memory.MemoryUnit{}
 	volume := &volume.VolumeUnit{}
@@ -131,7 +135,7 @@ func main() {
 	diskStat := &diskstats.DiskStatUnit{DevName: "nvme0n1"}
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
 	units := []Unit{
-		cpuTemp, ssdTemp, chipsetTemp,
+		cpuTemp, ssdTemp, //chipsetTemp, wifiTemp,
 		cpuLoad, memory, volume, nets,
 		batCapacity, batMaxCapacity, batPowerNow,
 		diskStat, swayMsg}
@@ -162,8 +166,8 @@ func main() {
 			cpuTempCol, cpuTemp.Num, dim("°C"),
 			cpuIsUrgent)
 
-		// Chipset
-		pBlock("#b25d57", `"%d%s"`, chipsetTemp.Num, dim("°C"))
+		// // Chipset
+		// pBlock("#b25d57", `"%d%s %d%s"`, chipsetTemp.Num, dim("°C"), wifiTemp.Num, dim("°C"))
 
 		// Storage
 		availRoot := utils.AvailDiskSpaceSafe("/", onError)
@@ -212,12 +216,14 @@ func main() {
 		for _, net := range nets.Networks {
 			if net.DevName != "lo" {
 				name := net.DevName + ":"
-				if net.DevName == "enp3s0" {
+				if net.DevName == "eno2" {
 					name = fiEthernet
 				} else if net.DevName == "ppp0" {
 					name = fiNetworkWired
-				} else if net.DevName == "wlan0" {
+				} else if net.DevName == "wlo1" {
 					name = fiWifi
+				} else if strings.HasPrefix(net.DevName, "enp0s20f") {
+					name = fiMobileScreenButton
 				}
 				pBlock("#86762f", `"%s %s%s%s"`,
 					name,

@@ -37,7 +37,7 @@ Listens for volume changes, updates `Volume` and `IsMuted` fields. Requires `lib
 
 Gathers network interfaces stats from `/proc/net/dev`, saves them to `Networks` array and `NetworkByDevName` map.
 
-`SkipFunc` may be used to ignore some interfeces: `SkipFunc: func(name string) bool { return name == "lo" }`
+`SkipFunc` may be used to ignore some interfaces: `SkipFunc: func(name string) bool { return name == "lo" }`
 
 #### diskstats.DiskStatUnit{DevName}
 

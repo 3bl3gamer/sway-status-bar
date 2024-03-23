@@ -69,6 +69,39 @@ func FindHwmonFileByNameSafe(pattern, name string, onError func(error)) string {
 	return fpath
 }
 
+func FindHwmonFileBySubsysnqn(pattern, subsysnqnPart string) (string, error) {
+	fnames, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", err
+	}
+	foundFName := ""
+	for _, fname := range fnames {
+		buf, err := ioutil.ReadFile(fname + "/device/subsysnqn")
+		if err != nil {
+			return "", err
+		}
+		if strings.Contains(string(buf), subsysnqnPart) {
+			if foundFName == "" {
+				foundFName = fname
+			} else {
+				return "", errors.New("found multiple files for " + pattern + " and subsysnq with " + subsysnqnPart)
+			}
+		}
+	}
+	if foundFName == "" {
+		return "", errors.New("found no files for " + pattern + " and subsysnq with " + subsysnqnPart)
+	}
+	return foundFName + "/temp1_input", nil
+}
+
+func FindHwmonFileBySubsysnqnSafe(pattern, subsysnqnPart string, onError func(error)) string {
+	fpath, err := FindHwmonFileBySubsysnqn(pattern, subsysnqnPart)
+	if err != nil {
+		onError(err)
+	}
+	return fpath
+}
+
 func FileReadInt64(fpath string) (int64, error) {
 	f, err := os.Open(fpath)
 	if err != nil {
