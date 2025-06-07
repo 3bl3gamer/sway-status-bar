@@ -10,6 +10,7 @@ import (
 	"sway_status_bar/filenum"
 	"sway_status_bar/memory"
 	"sway_status_bar/networks"
+	"sway_status_bar/nvidia"
 	"sway_status_bar/swaymsg"
 	"sway_status_bar/utils"
 	"sway_status_bar/volume"
@@ -54,11 +55,16 @@ const (
 	fiBatteryEmpty         = "\uf244"
 	fiBolt                 = "\uf0e7"
 	fiMobileScreenButton   = "\uf3cd"
+	fiMountainSun          = "\ue52f"
+	fiVolcano              = "\uf770"
+	fiMountain             = "\uf6fc"
 )
 
 const pangoSubSeparator = "<span color='#AAA'>/</span>"
 const (
 	dimCol      = "#888888"
+	warnCol     = "#FC0"
+	onCol       = "#77FF77"
 	rxCol       = "#77FF77"
 	rxFractCol  = "#559955"
 	txCol       = "#FF7777"
@@ -124,6 +130,7 @@ func main() {
 	// wifiTemp := &filenum.FileNumUnit{FPath: wifiTempFPath, Denum: 1000}
 	cpuLoad := &cpuload.CpuLoadUnit{}
 	memory := &memory.MemoryUnit{}
+	nvidiaGPU := &nvidia.NvidiaGPUUnit{}
 	volume := &volume.VolumeUnit{}
 	nets := &networks.NetworksUnit{SkipFunc: func(name string) bool {
 		return name == "lo" || strings.HasPrefix(name, "docker") ||
@@ -136,7 +143,7 @@ func main() {
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
 	units := []Unit{
 		cpuTemp, ssdTemp, //chipsetTemp, wifiTemp,
-		cpuLoad, memory, volume, nets,
+		cpuLoad, memory, nvidiaGPU, volume, nets,
 		batCapacity, batMaxCapacity, batPowerNow,
 		diskStat, swayMsg}
 
@@ -158,13 +165,34 @@ func main() {
 			cpuTempCol = "color='#F99'"
 			cpuIsUrgent = true
 		} else if cpuTemp.Num >= 70 {
-			cpuTempCol = "color='#FC0'"
+			cpuTempCol = "color='" + warnCol + "'"
 		}
 		pBlock("#b25d57", `"%s %2d%s<span color='#BBB'>%2d</span>%s <span %s>%d</span>%s", "urgent":%t`,
 			fiMicrochip,
 			cpuLoad.CpuLoad, pangoSubSeparator, cpuLoad.MaxCoreLoad, dim("%"),
 			cpuTempCol, cpuTemp.Num, dim("°C"),
 			cpuIsUrgent)
+
+		// Nvidia GPU
+		if time.Since(nvidiaGPU.LastAwakeAt) < 10*time.Second {
+			gpuRuntimeStatus := nvidiaGPU.RuntimeStatus
+			gpuTempCol := ""
+			if gpuRuntimeStatus == "active" {
+				gpuRuntimeStatus = "A"
+				gpuTempCol = "color='" + onCol + "'"
+			} else if gpuRuntimeStatus == "suspended" {
+				gpuRuntimeStatus = "S"
+				gpuTempCol = "color='" + dimCol + "'"
+			} else {
+				if gpuRuntimeStatus == "resuming" {
+					gpuRuntimeStatus = "^"
+				} else if gpuRuntimeStatus == "suspending" {
+					gpuRuntimeStatus = "v"
+				}
+				gpuTempCol = "color='" + warnCol + "'"
+			}
+			pBlock("#b25d57", `"%s <span %s>%s</span>"`, fiMountainSun, gpuTempCol, gpuRuntimeStatus)
+		}
 
 		// // Chipset
 		// pBlock("#b25d57", `"%d%s %d%s"`, chipsetTemp.Num, dim("°C"), wifiTemp.Num, dim("°C"))
