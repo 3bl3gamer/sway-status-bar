@@ -214,23 +214,29 @@ func main() {
 
 		// Networks
 		for _, net := range nets.Networks {
-			if net.DevName != "lo" {
-				name := net.DevName + ":"
-				if net.DevName == "eno2" {
-					name = fiEthernet
-				} else if net.DevName == "ppp0" {
-					name = fiNetworkWired
-				} else if net.DevName == "wlo1" {
-					name = fiWifi
-				} else if strings.HasPrefix(net.DevName, "enp0s20f") {
-					name = fiMobileScreenButton
-				}
-				pBlock("#86762f", `"%s %s%s%s"`,
-					name,
-					utils.FmtSizePango(net.RxSpeed, rxCol, rxFractCol, dimCol, 3),
-					pangoSubSeparator,
-					utils.FmtSizePango(net.TxSpeed, txCol, txFractCol, dimCol, -3))
+			if net.DevName == "lo" {
+				continue
 			}
+			if time.Since(net.LastDataAt) > 10*time.Second {
+				continue
+			}
+
+			name := net.DevName + ":"
+			if net.DevName == "eno2" {
+				name = fiEthernet
+			} else if net.DevName == "ppp0" {
+				name = fiNetworkWired
+			} else if net.DevName == "wlo1" {
+				name = fiWifi
+			} else if strings.HasPrefix(net.DevName, "enp0s20f") {
+				name = fiMobileScreenButton
+			}
+			pBlock("#86762f", `"%s %s%s%s"`,
+				name,
+				utils.FmtSizePango(net.RxSpeed, rxCol, rxFractCol, dimCol, 3),
+				pangoSubSeparator,
+				utils.FmtSizePango(net.TxSpeed, txCol, txFractCol, dimCol, -3))
+
 		}
 
 		// Time

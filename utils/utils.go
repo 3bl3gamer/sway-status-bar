@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -44,7 +43,7 @@ func FindHwmonFileByName(pattern, name string) (string, error) {
 	}
 	foundFName := ""
 	for _, fname := range fnames {
-		buf, err := ioutil.ReadFile(fname + "/name")
+		buf, err := os.ReadFile(fname + "/name")
 		if err != nil {
 			return "", err
 		}
@@ -77,7 +76,7 @@ func FindHwmonFileBySubsysnqn(pattern, subsysnqnPart string) (string, error) {
 	}
 	foundFName := ""
 	for _, fname := range fnames {
-		buf, err := ioutil.ReadFile(fname + "/device/subsysnqn")
+		buf, err := os.ReadFile(fname + "/device/subsysnqn")
 		if err != nil {
 			return "", err
 		}
@@ -109,7 +108,7 @@ func FileReadInt64(fpath string) (int64, error) {
 		return 0, err
 	}
 	defer f.Close()
-	buf, err := ioutil.ReadAll(f)
+	buf, err := io.ReadAll(f)
 	if err != nil {
 		return 0, err
 	}

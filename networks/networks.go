@@ -3,19 +3,20 @@ package networks
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"sway_status_bar/utils"
 	"time"
 )
 
 type Network struct {
-	DevName   string
-	TxBytes   int64
-	RxBytes   int64
-	TxSpeed   int64
-	RxSpeed   int64
-	isPresent bool
+	DevName    string
+	TxBytes    int64
+	RxBytes    int64
+	TxSpeed    int64
+	RxSpeed    int64
+	LastDataAt time.Time
+	isPresent  bool
 }
 
 type NetworksUnit struct {
@@ -37,7 +38,7 @@ func (u *NetworksUnit) Update(iter int64) error {
 	timeDelta := int64(now.Sub(u.lastUpdateAt))
 	u.lastUpdateAt = now
 
-	buf, err := ioutil.ReadFile("/proc/net/dev")
+	buf, err := os.ReadFile("/proc/net/dev")
 	if err != nil {
 		return err
 	}
@@ -72,6 +73,10 @@ func (u *NetworksUnit) Update(iter int64) error {
 		if !alreadyExists {
 			net = &Network{DevName: name, RxBytes: rxBytes, TxBytes: txBytes}
 			u.NetworkByDevName[name] = net
+		}
+
+		if rxBytes > net.RxBytes || txBytes > net.TxBytes {
+			net.LastDataAt = now
 		}
 
 		if alreadyExists {
