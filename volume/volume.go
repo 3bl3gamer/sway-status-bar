@@ -24,7 +24,6 @@ func (u *VolumeUnit) listenVolumeUpdates(onUpdate func(), onError func(error)) {
 	for {
 		cmd, scanner, err := utils.ScanCommand("pactl", "subscribe")
 		if err != nil {
-			println(1)
 			onError(err)
 			time.Sleep(time.Second)
 			continue
@@ -54,47 +53,32 @@ func (u *VolumeUnit) listenVolumeUpdates(onUpdate func(), onError func(error)) {
 }
 
 func (u *VolumeUnit) updateVolume() error {
-	cmd, scanner, err := utils.ScanCommand("pacmd", "info")
+	cmd, scanner, err := utils.ScanCommand("wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@")
 	if err != nil {
 		return err
 	}
-	prefix_defaultSnikName := "Default sink name: "
-	defaultSnikName := ""
-	readingDefaultSink := false
-	volumeFound := false
-	mutedFound := false
-	for scanner.Scan() {
-		line := scanner.Text()
-		if readingDefaultSink && strings.HasPrefix(line, "\tvolume: ") {
-			index := strings.IndexByte(line, '%')
-			if index == -1 {
-				return errors.New(`no '%' in line '` + line + `'`)
-			}
-			val, err := strconv.ParseInt(strings.TrimSpace(line[index-3:index]), 10, 64)
-			if err != nil {
-				return err
-			}
-			u.Volume = val
-			volumeFound = true
-		} else if readingDefaultSink && line == "\tmuted: no" {
-			u.IsMuted = false
-			mutedFound = true
-		} else if readingDefaultSink && line == "\tmuted: yes" {
-			u.IsMuted = true
-			mutedFound = true
-		} else if defaultSnikName == "" && strings.HasPrefix(line, prefix_defaultSnikName) {
-			defaultSnikName = line[len(prefix_defaultSnikName):]
-		} else if strings.HasSuffix(line, "name: <"+defaultSnikName+">") {
-			readingDefaultSink = true
+
+	hasReadVolume := false
+	scanner.Scan()
+	line := scanner.Text()
+	if lineRem, found := strings.CutPrefix(line, "Volume: "); found {
+		lineRem, u.IsMuted = strings.CutSuffix(lineRem, "[MUTED]")
+
+		volumeFract, err := strconv.ParseFloat(strings.TrimSpace(lineRem), 64)
+		if err == nil {
+			u.Volume = int64(volumeFract * 100)
+			hasReadVolume = true
 		}
-		if volumeFound && mutedFound {
-			break
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return err
 	}
 	if err := cmd.Process.Kill(); err != nil {
+		return err
+	}
+
+	if !hasReadVolume {
+		return errors.New("unexpected wpctl response: " + line)
+	}
+
+	if err := scanner.Err(); err != nil {
 		return err
 	}
 	return nil

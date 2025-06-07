@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -186,4 +187,15 @@ func FmtSizePango(n int64, baseCol, fracCol, letterCol string, numPadChars int64
 		res = res + paddig
 	}
 	return res
+}
+
+// nvme-KINGSTON_NUMBER_SERIAL -> nvme0n1
+//
+// IDs from /dev/disk/by-id/
+func FindDevNameByIDSafe(id string, onError func(error)) string {
+	dest, err := os.Readlink("/dev/disk/by-id/" + id)
+	if err != nil {
+		onError(err)
+	}
+	return path.Base(dest)
 }

@@ -132,7 +132,7 @@ func main() {
 	batCapacity := &filenum.FileNumUnit{FPath: batDirPath + "/capacity", Denum: 1}
 	batMaxCapacity := &filenum.FileNumUnit{FPath: batDirPath + "/charge_control_end_threshold", Denum: 1}
 	batPowerNow := &filenum.FileNumUnit{FPath: batDirPath + "/power_now", Denum: 1000000}
-	diskStat := &diskstats.DiskStatUnit{DevName: "nvme0n1"}
+	diskStat := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-KINGSTON_SKC3000D2048G_50026B76865102B9", onError)}
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
 	units := []Unit{
 		cpuTemp, ssdTemp, //chipsetTemp, wifiTemp,
