@@ -138,7 +138,7 @@ func main() {
 	}}
 	batCapacity := &filenum.FileNumUnit{FPath: batDirPath + "/capacity", Denum: 1}
 	batMaxCapacity := &filenum.FileNumUnit{FPath: batDirPath + "/charge_control_end_threshold", Denum: 1}
-	batPowerNow := &filenum.FileNumUnit{FPath: batDirPath + "/power_now", Denum: 1000000}
+	batPowerNow := &filenum.FileNumUnitNonZero{FPath: batDirPath + "/power_now", Denum: 1000000}
 	diskStat := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-KINGSTON_SKC3000D2048G_50026B76865102B9", onError)}
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
 	units := []Unit{
@@ -237,8 +237,12 @@ func main() {
 		} else if batCapacity.Num <= 90 {
 			batIcon = fiBatteryThreeQuarters
 		}
-		pBlock("#a3609a", `"%s %d%s<span color='#BBB'>%d</span>%s %2d%s"`,
-			batIcon, batCapacity.Num, pangoSubSeparator, batMaxCapacity.Num, dim("%"), batPowerNow.Num, dim("W"))
+		batPowerStr := ""
+		if time.Since(batPowerNow.LastNonZeroAt) < 10*time.Second {
+			batPowerStr = fmt.Sprintf(" %2d%s", batPowerNow.Num, dim("W"))
+		}
+		pBlock("#a3609a", `"%s %d%s<span color='#BBB'>%d</span>%s%s"`,
+			batIcon, batCapacity.Num, pangoSubSeparator, batMaxCapacity.Num, dim("%"), batPowerStr)
 
 		// Networks
 		for _, net := range nets.Networks {
