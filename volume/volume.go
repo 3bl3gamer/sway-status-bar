@@ -14,8 +14,17 @@ type VolumeUnit struct {
 }
 
 func (u *VolumeUnit) StartInBackground(onUpdate func(), onError func(error)) {
-	if err := u.updateVolume(); err != nil {
-		onError(err)
+	// wpctl may return empty response just after sway start
+	for i := 0; i < 5; i++ {
+		err, hasUpdated := u.updateVolume()
+		if err != nil {
+			onError(err)
+			break
+		}
+		if hasUpdated {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 	go u.listenVolumeUpdates(onUpdate, onError)
 }
@@ -31,11 +40,14 @@ func (u *VolumeUnit) listenVolumeUpdates(onUpdate func(), onError func(error)) {
 
 		for scanner.Scan() {
 			if strings.HasPrefix(scanner.Text(), "Event 'change' on sink") {
-				if err := u.updateVolume(); err != nil {
+				err, hasUpdated := u.updateVolume()
+				if err != nil {
 					onError(err)
 					continue
 				}
-				onUpdate()
+				if hasUpdated {
+					onUpdate()
+				}
 			}
 		}
 		if err := scanner.Err(); err != nil {
@@ -52,14 +64,23 @@ func (u *VolumeUnit) listenVolumeUpdates(onUpdate func(), onError func(error)) {
 	}
 }
 
-func (u *VolumeUnit) updateVolume() error {
+func (u *VolumeUnit) updateVolume() (error, bool) {
 	cmd, scanner, err := utils.ScanCommand("wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@")
 	if err != nil {
-		return err
+		return err, false
+	}
+
+	hasReadLine := scanner.Scan()
+
+	if err := cmd.Process.Kill(); err != nil {
+		return err, false
+	}
+
+	if !hasReadLine {
+		return nil, false
 	}
 
 	hasReadVolume := false
-	scanner.Scan()
 	line := scanner.Text()
 	if lineRem, found := strings.CutPrefix(line, "Volume: "); found {
 		lineRem, u.IsMuted = strings.CutSuffix(lineRem, "[MUTED]")
@@ -70,16 +91,12 @@ func (u *VolumeUnit) updateVolume() error {
 			hasReadVolume = true
 		}
 	}
-	if err := cmd.Process.Kill(); err != nil {
-		return err
-	}
-
 	if !hasReadVolume {
-		return errors.New("unexpected wpctl response: " + line)
+		return errors.New("unexpected wpctl response: " + line), false
 	}
 
 	if err := scanner.Err(); err != nil {
-		return err
+		return err, false
 	}
-	return nil
+	return nil, true
 }

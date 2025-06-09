@@ -27,9 +27,11 @@ type NetworksUnit struct {
 }
 
 func (u *NetworksUnit) Update(iter int64) error {
-	if iter%3 != 0 {
+	// decreasing update interval just after start to fill LastDataAt as fast as possible
+	if iter > 3 && iter%3 != 0 {
 		return nil
 	}
+
 	if u.NetworkByDevName == nil {
 		u.NetworkByDevName = make(map[string]*Network)
 	}
