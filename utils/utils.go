@@ -36,7 +36,7 @@ func ScanCommand(name string, arg ...string) (*exec.Cmd, *bufio.Scanner, error) 
 	return cmd, bufio.NewScanner(out), nil
 }
 
-func FindHwmonFileByName(pattern, name string) (string, error) {
+func FindHwmonDirByName(pattern, name string) (string, error) {
 	fnames, err := filepath.Glob(pattern)
 	if err != nil {
 		return "", err
@@ -58,18 +58,18 @@ func FindHwmonFileByName(pattern, name string) (string, error) {
 	if foundFName == "" {
 		return "", errors.New("found no files for " + pattern + " and " + name)
 	}
-	return foundFName + "/temp1_input", nil
+	return foundFName, nil
 }
 
-func FindHwmonFileByNameSafe(pattern, name string, onError func(error)) string {
-	fpath, err := FindHwmonFileByName(pattern, name)
+func FindHwmonDirByNameSafe(pattern, name string, onError func(error)) string {
+	fpath, err := FindHwmonDirByName(pattern, name)
 	if err != nil {
 		onError(err)
 	}
 	return fpath
 }
 
-func FindHwmonFileBySubsysnqn(pattern, subsysnqnPart string) (string, error) {
+func FindHwmonDirBySubsysnqn(pattern, subsysnqnPart string) (string, error) {
 	fnames, err := filepath.Glob(pattern)
 	if err != nil {
 		return "", err
@@ -91,11 +91,11 @@ func FindHwmonFileBySubsysnqn(pattern, subsysnqnPart string) (string, error) {
 	if foundFName == "" {
 		return "", errors.New("found no files for " + pattern + " and subsysnq with " + subsysnqnPart)
 	}
-	return foundFName + "/temp1_input", nil
+	return foundFName, nil
 }
 
-func FindHwmonFileBySubsysnqnSafe(pattern, subsysnqnPart string, onError func(error)) string {
-	fpath, err := FindHwmonFileBySubsysnqn(pattern, subsysnqnPart)
+func FindHwmonDirBySubsysnqnSafe(pattern, subsysnqnPart string, onError func(error)) string {
+	fpath, err := FindHwmonDirBySubsysnqn(pattern, subsysnqnPart)
 	if err != nil {
 		onError(err)
 	}

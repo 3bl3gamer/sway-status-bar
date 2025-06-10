@@ -19,12 +19,14 @@ import (
 
 const interval = time.Second
 
-var cpuTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/platform/coretemp.0/hwmon/hwmon*", "coretemp", onError)
-var ssdTempFPath = utils.FindHwmonFileBySubsysnqnSafe("/sys/devices/pci0000:00/0000:00:06.*/0000:0*:00.0/nvme/nvme*/hwmon*", "kingston", onError)
+var cpuTempFPath = utils.FindHwmonDirByNameSafe("/sys/devices/platform/coretemp.0/hwmon/hwmon*", "coretemp", onError) + "/temp1_input"
+var ssdTempFPath = utils.FindHwmonDirBySubsysnqnSafe("/sys/devices/pci0000:00/0000:00:06.*/0000:0*:00.0/nvme/nvme*/hwmon*", "kingston", onError) + "/temp1_input"
 
-// var chipsetTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone0/hwmon*", "acpitz", onError)
-// var wifiTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone*/hwmon*", "iwlwifi_1", onError)
+// var chipsetTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone0/hwmon*", "acpitz", onError) + "/temp1_input"
+// var wifiTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone*/hwmon*", "iwlwifi_1", onError) + "/temp1_input"
 var batDirPath = "/sys/devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/device:08/PNP0C09:01/PNP0C0A:03/power_supply/BAT0"
+
+var fansDirPath = utils.FindHwmonDirByNameSafe("/sys/devices/platform/asus-nb-wmi/hwmon/hwmon*", "asus", onError)
 
 const (
 	fiMicrochip            = "\uf2db"
@@ -58,6 +60,7 @@ const (
 	fiMountainSun          = "\ue52f"
 	fiVolcano              = "\uf770"
 	fiMountain             = "\uf6fc"
+	fiFan                  = "\uf863"
 )
 
 const pangoSubSeparator = "<span color='#AAA'>/</span>"
@@ -72,6 +75,12 @@ const (
 	titleBgCol0 = "#005577"
 	titleBgCol1 = "#007733"
 )
+
+const thinSpace = "\u2009"
+
+// For some reason, when left and right borders are zero, the text goes beyond the bottom padding on the right (for a bit).
+// Fixing this by adding a bit of transparent text on the right.
+const blockExtraRightPad = thinSpace
 
 func dim(text string) string {
 	return "<span color='" + dimCol + "'>" + text + "</span>"
@@ -92,7 +101,7 @@ func p(text string) {
 }
 
 func pBlock(underlineCol, format string, a ...interface{}) {
-	p(`{"full_text":` + fmt.Sprintf(format, a...) + `, "markup":"pango", "border_left":0, "border_right":0, "border_bottom":2, "border_top":0, "border":"` + underlineCol + `"},`)
+	p(`{"full_text":` + fmt.Sprintf(format, a...) + `, "markup":"pango", "border_left":0, "border_right":0, "border_bottom":3, "border_top":0, "border":"` + underlineCol + `"},`)
 }
 
 var iterCount = int64(0)
@@ -131,6 +140,8 @@ func main() {
 	cpuLoad := &cpuload.CpuLoadUnit{}
 	memory := &memory.MemoryUnit{}
 	nvidiaGPU := &nvidia.NvidiaGPUUnit{}
+	cpuFanSpeed := &filenum.FileNumUnit{FPath: fansDirPath + "/fan1_input", Denum: 1}
+	gpuFanSpeed := &filenum.FileNumUnit{FPath: fansDirPath + "/fan2_input", Denum: 1}
 	volume := &volume.VolumeUnit{}
 	nets := &networks.NetworksUnit{SkipFunc: func(name string) bool {
 		return name == "lo" || strings.HasPrefix(name, "docker") ||
@@ -144,6 +155,7 @@ func main() {
 	units := []Unit{
 		cpuTemp, ssdTemp, //chipsetTemp, wifiTemp,
 		cpuLoad, memory, nvidiaGPU, volume, nets,
+		cpuFanSpeed, gpuFanSpeed,
 		batCapacity, batMaxCapacity, batPowerNow,
 		diskStat, swayMsg}
 
@@ -167,10 +179,11 @@ func main() {
 		} else if cpuTemp.Num >= 70 {
 			cpuTempCol = "color='" + warnCol + "'"
 		}
-		pBlock("#b25d57", `"%s %2d%s<span color='#BBB'>%2d</span>%s <span %s>%d</span>%s", "urgent":%t`,
+		pBlock("#b25d57", `"%s %2d%s<span color='#BBB'>%2d</span>%s <span %s>%d</span>%s%s", "urgent":%t`,
 			fiMicrochip,
 			cpuLoad.CpuLoad, pangoSubSeparator, cpuLoad.MaxCoreLoad, dim("%"),
 			cpuTempCol, cpuTemp.Num, dim("°C"),
+			blockExtraRightPad,
 			cpuIsUrgent)
 
 		// Nvidia GPU
@@ -191,8 +204,26 @@ func main() {
 				}
 				gpuTempCol = "color='" + warnCol + "'"
 			}
-			pBlock("#b25d57", `"%s <span %s>%s</span>"`, fiMountainSun, gpuTempCol, gpuRuntimeStatus)
+			pBlock("#b25d57", `"%s <span %s>%s</span>%s"`, fiMountainSun, gpuTempCol, gpuRuntimeStatus, blockExtraRightPad)
 		}
+
+		// Fans
+		println(cpuFanSpeed.Num)
+		println(gpuFanSpeed.Num)
+		print(fansDirPath)
+		maxFanSpeed := cpuFanSpeed.Num
+		if gpuFanSpeed.Num > maxFanSpeed {
+			maxFanSpeed = gpuFanSpeed.Num
+		}
+		fanIconCol := ""
+		if maxFanSpeed > 3000 {
+			fanIconCol = "color='" + warnCol + "'"
+		} else if maxFanSpeed > 2000 {
+			fanIconCol = "color='" + onCol + "'"
+		} else if maxFanSpeed == 0 {
+			fanIconCol = "color='" + dimCol + "'"
+		}
+		pBlock("#b25d57", `"<span %s>%s</span>%s"`, fanIconCol, fiFan, blockExtraRightPad)
 
 		// // Chipset
 		// pBlock("#b25d57", `"%d%s %d%s"`, chipsetTemp.Num, dim("°C"), wifiTemp.Num, dim("°C"))
@@ -200,18 +231,19 @@ func main() {
 		// Storage
 		availRoot := utils.AvailDiskSpaceSafe("/", onError)
 		availIsUrgent := availRoot < availSpaceUrgentLimit
-		pBlock("#368653", `"%s %s %s%s%s %d%s", "urgent":%t`,
+		pBlock("#368653", `"%s %s %s%s%s %d%s%s", "urgent":%t`,
 			fiHdd,
 			utils.FmtSizePango(availRoot, "#FFF", "#FFF", dimCol, 0),
 			utils.FmtSizePango(diskStat.ReadSpeed, rxCol, rxFractCol, dimCol, 3),
 			pangoSubSeparator,
 			utils.FmtSizePango(diskStat.WriteSpeed, txCol, txFractCol, dimCol, -3),
 			ssdTemp.Num, dim("°C"),
+			blockExtraRightPad,
 			availIsUrgent)
 
 		// Memory
 		memIsUrgent := memory.Percent >= 98
-		pBlock("#4d79bb", `"%s %d%s", "urgent":%t`, fiMemory, memory.Percent, dim("%"), memIsUrgent)
+		pBlock("#4d79bb", `"%s %d%s%s", "urgent":%t`, fiMemory, memory.Percent, dim("%"), blockExtraRightPad, memIsUrgent)
 
 		// Volume
 		volIcon := fiVolumeMute
@@ -224,7 +256,7 @@ func main() {
 				volIcon = fiVolumeUp
 			}
 		}
-		pBlock("#a3609a", `"%s %2d%%"`, volIcon, volume.Volume)
+		pBlock("#a3609a", `"%s %2d%%%s"`, volIcon, volume.Volume, blockExtraRightPad)
 
 		// Battery
 		batIcon := fiBatteryFull
@@ -241,8 +273,8 @@ func main() {
 		if time.Since(batPowerNow.LastNonZeroAt) < 10*time.Second {
 			batPowerStr = fmt.Sprintf(" %2d%s", batPowerNow.Num, dim("W"))
 		}
-		pBlock("#a3609a", `"%s %d%s<span color='#BBB'>%d</span>%s%s"`,
-			batIcon, batCapacity.Num, pangoSubSeparator, batMaxCapacity.Num, dim("%"), batPowerStr)
+		pBlock("#a3609a", `"%s %d%s<span color='#BBB'>%d</span>%s%s%s"`,
+			batIcon, batCapacity.Num, pangoSubSeparator, batMaxCapacity.Num, dim("%"), batPowerStr, blockExtraRightPad)
 
 		// Networks
 		for _, net := range nets.Networks {
@@ -263,16 +295,17 @@ func main() {
 			} else if strings.HasPrefix(net.DevName, "enp0s20f") {
 				name = fiMobileScreenButton
 			}
-			pBlock("#86762f", `"%s %s%s%s"`,
+			pBlock("#86762f", `"%s %s%s%s%s"`,
 				name,
 				utils.FmtSizePango(net.RxSpeed, rxCol, rxFractCol, dimCol, 3),
 				pangoSubSeparator,
-				utils.FmtSizePango(net.TxSpeed, txCol, txFractCol, dimCol, -3))
+				utils.FmtSizePango(net.TxSpeed, txCol, txFractCol, dimCol, -3),
+				blockExtraRightPad)
 
 		}
 
 		// Time
-		p(`{"full_text":"` + time.Now().Format("15:04:05") + `"},`)
+		p(`{"full_text":"` + time.Now().Format("15:04:05") + blockExtraRightPad + `"},`)
 	}
 	render := func() {
 		p("[")
