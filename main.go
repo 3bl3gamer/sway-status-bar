@@ -20,7 +20,10 @@ import (
 const interval = time.Second
 
 var cpuTempFPath = utils.FindHwmonDirByNameSafe("/sys/devices/platform/coretemp.0/hwmon/hwmon*", "coretemp", onError) + "/temp1_input"
-var ssdTempFPath = utils.FindHwmonDirBySubsysnqnSafe("/sys/devices/pci0000:00/0000:00:06.*/0000:0*:00.0/nvme/nvme*/hwmon*", "kingston", onError) + "/temp1_input"
+var ssdKingstonTempFPath = utils.FindHwmonDirBySubsysnqnSafe("/sys/devices/pci0000:00/0000:00:06.*/0000:0*:00.0/nvme/nvme*/hwmon*", "kingston", onError) + "/temp1_input"
+var ssdSamsungDirPath = utils.FindHwmonDirBySubsysnqnSafe("/sys/devices/pci0000:00/0000:00:06.*/0000:0*:00.0/nvme/nvme*/hwmon*", "samsung", onError)
+var ssdSamsungControllerTempFPath = utils.FindTempInputByLabelSafe(ssdSamsungDirPath, "Sensor 1", onError)
+var ssdSamsungNANDTempFPath1 = utils.FindTempInputByLabelSafe(ssdSamsungDirPath, "Sensor 2", onError)
 
 // var chipsetTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone0/hwmon*", "acpitz", onError) + "/temp1_input"
 // var wifiTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone*/hwmon*", "iwlwifi_1", onError) + "/temp1_input"
@@ -134,7 +137,9 @@ func main() {
 	}
 
 	cpuTemp := &filenum.FileNumUnit{FPath: cpuTempFPath, Denum: 1000}
-	ssdTemp := &filenum.FileNumUnit{FPath: ssdTempFPath, Denum: 1000}
+	ssdKingstonTemp := &filenum.FileNumUnit{FPath: ssdKingstonTempFPath, Denum: 1000}
+	ssdSamsungControllerTemp := &filenum.FileNumUnit{FPath: ssdSamsungControllerTempFPath, Denum: 1000}
+	ssdSamsungNANDTemp := &filenum.FileNumUnit{FPath: ssdSamsungNANDTempFPath1, Denum: 1000}
 	// chipsetTemp := &filenum.FileNumUnit{FPath: chipsetTempFPath, Denum: 1000}
 	// wifiTemp := &filenum.FileNumUnit{FPath: wifiTempFPath, Denum: 1000}
 	cpuLoad := &cpuload.CpuLoadUnit{}
@@ -150,14 +155,15 @@ func main() {
 	batCapacity := &filenum.FileNumUnit{FPath: batDirPath + "/capacity", Denum: 1}
 	batMaxCapacity := &filenum.FileNumUnit{FPath: batDirPath + "/charge_control_end_threshold", Denum: 1}
 	batPowerNow := &filenum.FileNumUnitNonZero{FPath: batDirPath + "/power_now", Denum: 1000000}
-	diskStat := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-KINGSTON_SKC3000D2048G_50026B76865102B9", onError)}
+	diskStatKingston := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-KINGSTON_SKC3000D2048G_50026B76865102B9", onError)}
+	diskStatSamsung := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-Samsung_SSD_990_EVO_Plus_4TB_S7U8NJ0Y501696X", onError)}
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
 	units := []Unit{
-		cpuTemp, ssdTemp, //chipsetTemp, wifiTemp,
+		cpuTemp, ssdKingstonTemp, ssdSamsungControllerTemp, ssdSamsungNANDTemp, //chipsetTemp, wifiTemp,
 		cpuLoad, memory, nvidiaGPU, volume, nets,
 		cpuFanSpeed, gpuFanSpeed,
 		batCapacity, batMaxCapacity, batPowerNow,
-		diskStat, swayMsg}
+		diskStatKingston, diskStatSamsung, swayMsg}
 
 	renderBlocks := func() {
 		// pBlock("#FFFFFF", `"i%d %d"`, iterCount, layoutIndex)
@@ -229,17 +235,48 @@ func main() {
 		// pBlock("#b25d57", `"%d%s %d%s"`, chipsetTemp.Num, dim("°C"), wifiTemp.Num, dim("°C"))
 
 		// Storage
-		availRoot := utils.AvailDiskSpaceSafe("/", onError)
-		availIsUrgent := availRoot < availSpaceUrgentLimit
-		pBlock("#368653", `"%s %s %s%s%s %d%s%s", "urgent":%t`,
+		ssdAvail := utils.AvailDiskSpaceSafe("/", onError)
+		ssdIsUrgent := ssdAvail < availSpaceUrgentLimit || ssdKingstonTemp.Num > 75
+		var ssdTemp string
+		if ssdKingstonTemp.Num < 60 {
+			ssdTemp = fmt.Sprintf("<span color='#BBB'>%d</span>%s", ssdKingstonTemp.Num, dim("°C"))
+		} else {
+			ssdTemp = fmt.Sprintf("%d%s", ssdKingstonTemp.Num, dim("°C"))
+		}
+		pBlock("#368653", `"%s %s %s%s%s %s%s", "urgent":%t`,
 			fiHdd,
-			utils.FmtSizePango(availRoot, "#FFF", "#FFF", dimCol, 0),
-			utils.FmtSizePango(diskStat.ReadSpeed, rxCol, rxFractCol, dimCol, 3),
+			utils.FmtSizePango(ssdAvail, "#FFF", "#FFF", dimCol, 0),
+			utils.FmtSizePango(diskStatKingston.ReadSpeed, rxCol, rxFractCol, dimCol, 3),
 			pangoSubSeparator,
-			utils.FmtSizePango(diskStat.WriteSpeed, txCol, txFractCol, dimCol, -3),
-			ssdTemp.Num, dim("°C"),
+			utils.FmtSizePango(diskStatKingston.WriteSpeed, txCol, txFractCol, dimCol, -3),
+			ssdTemp,
 			blockExtraRightPad,
-			availIsUrgent)
+			ssdIsUrgent)
+
+		// Storage (secondary)
+		ssdAvail = utils.AvailDiskSpaceSafe("/home/zblzgamer/secondary", onError)
+		ssdMaxTemp := utils.MaxInt64(ssdSamsungControllerTemp.Num, ssdSamsungNANDTemp.Num)
+		ssdIsUrgent = ssdAvail < availSpaceUrgentLimit || ssdMaxTemp > 75
+		ssdSpeedStr := ""
+		if time.Since(diskStatSamsung.LastReadWriteAt) < 10*time.Second {
+			ssdSpeedStr = fmt.Sprintf(" %s%s%s",
+				utils.FmtSizePango(diskStatSamsung.ReadSpeed, rxCol, rxFractCol, dimCol, 3),
+				pangoSubSeparator,
+				utils.FmtSizePango(diskStatSamsung.WriteSpeed, txCol, txFractCol, dimCol, -3))
+		}
+		if ssdSpeedStr == "" && ssdMaxTemp < 60 {
+			ssdTemp = fmt.Sprintf("<span color='#BBB'>%d</span>%s", ssdMaxTemp, dim("°C"))
+		} else {
+			ssdTemp = fmt.Sprintf("%d%s<span color='#BBB'>%d</span>%s",
+				ssdSamsungControllerTemp.Num, pangoSubSeparator, ssdSamsungNANDTemp.Num, dim("°C"))
+		}
+		pBlock("#368653", `"%s %s%s %s%s", "urgent":%t`,
+			fiHdd,
+			utils.FmtSizePango(ssdAvail, "#FFF", "#FFF", dimCol, 0),
+			ssdSpeedStr,
+			ssdTemp,
+			blockExtraRightPad,
+			ssdIsUrgent)
 
 		// Memory
 		memIsUrgent := memory.Percent >= 98

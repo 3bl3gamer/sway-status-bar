@@ -102,6 +102,47 @@ func FindHwmonDirBySubsysnqnSafe(pattern, subsysnqnPart string, onError func(err
 	return fpath
 }
 
+func FindTempInputByLabel(dirPath, label string) (string, error) {
+	f, err := os.Open(dirPath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	foundFName := ""
+	names, err := f.Readdirnames(-1)
+	if err != nil {
+		return "", err
+	}
+	for _, name := range names {
+		if strings.HasPrefix(name, "temp") && strings.HasSuffix(name, "_label") {
+			content, err := os.ReadFile(dirPath + "/" + name)
+			if err != nil {
+				return "", err
+			}
+			if strings.TrimSpace(string(content)) == label {
+				if foundFName == "" {
+					foundFName = name
+				} else {
+					return "", errors.New("found multiple temp*_label with " + label + " in " + dirPath)
+				}
+			}
+		}
+	}
+	if foundFName == "" {
+		return "", errors.New("found no temp*_label with " + label + " in " + dirPath)
+	}
+	return dirPath + "/" + strings.TrimSuffix(foundFName, "_label") + "_input", nil
+}
+
+func FindTempInputByLabelSafe(dirPath, label string, onError func(error)) string {
+	fpath, err := FindTempInputByLabel(dirPath, label)
+	if err != nil {
+		onError(err)
+	}
+	return fpath
+}
+
 func FileReadInt64(fpath string) (int64, error) {
 	f, err := os.Open(fpath)
 	if err != nil {
