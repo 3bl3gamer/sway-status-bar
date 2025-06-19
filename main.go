@@ -279,8 +279,11 @@ func main() {
 			ssdIsUrgent)
 
 		// Memory
-		memIsUrgent := memory.Percent >= 98
-		pBlock("#4d79bb", `"%s %d%s%s", "urgent":%t`, fiMemory, memory.Percent, dim("%"), blockExtraRightPad, memIsUrgent)
+		memIsUrgent := memory.Percent >= 95
+		pBlock("#4d79bb", `"%s %d%s<span color='#BBB'>%d</span>%s%s", "urgent":%t`,
+			fiMemory, memory.Percent,
+			pangoSubSeparator, memory.SwapPercent, dim("%"),
+			blockExtraRightPad, memIsUrgent)
 
 		// Volume
 		volIcon := fiVolumeMute
