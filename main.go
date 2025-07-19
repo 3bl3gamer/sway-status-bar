@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sway_status_bar/cpuload"
 	"sway_status_bar/diskstats"
-	"sway_status_bar/filenum"
+	"sway_status_bar/file"
 	"sway_status_bar/memory"
 	"sway_status_bar/networks"
 	"sway_status_bar/nvidia"
@@ -136,25 +136,25 @@ func main() {
 		}
 	}
 
-	cpuTemp := &filenum.FileNumUnit{FPath: cpuTempFPath, Denum: 1000}
-	ssdKingstonTemp := &filenum.FileNumUnit{FPath: ssdKingstonTempFPath, Denum: 1000}
-	ssdSamsungControllerTemp := &filenum.FileNumUnit{FPath: ssdSamsungControllerTempFPath, Denum: 1000}
-	ssdSamsungNANDTemp := &filenum.FileNumUnit{FPath: ssdSamsungNANDTempFPath1, Denum: 1000}
-	// chipsetTemp := &filenum.FileNumUnit{FPath: chipsetTempFPath, Denum: 1000}
-	// wifiTemp := &filenum.FileNumUnit{FPath: wifiTempFPath, Denum: 1000}
+	cpuTemp := &file.FileNumUnit{FPath: cpuTempFPath, Denum: 1000}
+	ssdKingstonTemp := &file.FileNumUnit{FPath: ssdKingstonTempFPath, Denum: 1000}
+	ssdSamsungControllerTemp := &file.FileNumUnit{FPath: ssdSamsungControllerTempFPath, Denum: 1000}
+	ssdSamsungNANDTemp := &file.FileNumUnit{FPath: ssdSamsungNANDTempFPath1, Denum: 1000}
+	// chipsetTemp := &file.FileNumUnit{FPath: chipsetTempFPath, Denum: 1000}
+	// wifiTemp := &file.FileNumUnit{FPath: wifiTempFPath, Denum: 1000}
 	cpuLoad := &cpuload.CpuLoadUnit{}
 	memory := &memory.MemoryUnit{}
 	nvidiaGPU := &nvidia.NvidiaGPUUnit{}
-	cpuFanSpeed := &filenum.FileNumUnit{FPath: fansDirPath + "/fan1_input", Denum: 1}
-	gpuFanSpeed := &filenum.FileNumUnit{FPath: fansDirPath + "/fan2_input", Denum: 1}
+	cpuFanSpeed := &file.FileNumUnit{FPath: fansDirPath + "/fan1_input", Denum: 1}
+	gpuFanSpeed := &file.FileNumUnit{FPath: fansDirPath + "/fan2_input", Denum: 1}
 	volume := &volume.VolumeUnit{}
 	nets := &networks.NetworksUnit{SkipFunc: func(name string) bool {
 		return name == "lo" || strings.HasPrefix(name, "docker") ||
 			strings.HasPrefix(name, "br-") || strings.HasPrefix(name, "veth")
 	}}
-	batCapacity := &filenum.FileNumUnit{FPath: batDirPath + "/capacity", Denum: 1}
-	batMaxCapacity := &filenum.FileNumUnit{FPath: batDirPath + "/charge_control_end_threshold", Denum: 1}
-	batPowerNow := &filenum.FileNumUnitNonZero{FPath: batDirPath + "/power_now", Denum: 1000000}
+	batCapacity := &file.FileNumUnit{FPath: batDirPath + "/capacity", Denum: 1}
+	batMaxCapacity := &file.FileNumUnit{FPath: batDirPath + "/charge_control_end_threshold", Denum: 1}
+	batPowerNow := &file.FileNumUnitNonZero{FPath: batDirPath + "/power_now", Denum: 1000000}
 	diskStatKingston := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-KINGSTON_SKC3000D2048G_50026B76865102B9", onError)}
 	diskStatSamsung := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-Samsung_SSD_990_EVO_Plus_4TB_S7U8NJ0Y501696X", onError)}
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}

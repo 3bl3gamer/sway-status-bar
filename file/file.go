@@ -1,4 +1,4 @@
-package filenum
+package file
 
 import (
 	"math"
