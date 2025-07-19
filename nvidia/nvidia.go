@@ -23,10 +23,13 @@ func (u *NvidiaGPUUnit) Update(iter int64) error {
 	// u.PowerState = strings.TrimSpace(string(buf))
 
 	buf, err := os.ReadFile("/sys/bus/pci/devices/0000:01:00.0/power/runtime_status")
-	if err != nil {
+	if os.IsNotExist(err) {
+		u.RuntimeStatus = "N/a"
+	} else if err != nil {
 		return err
+	} else {
+		u.RuntimeStatus = strings.TrimSpace(string(buf))
 	}
-	u.RuntimeStatus = strings.TrimSpace(string(buf))
 
 	if u.RuntimeStatus != "suspended" {
 		u.LastAwakeAt = time.Now()
