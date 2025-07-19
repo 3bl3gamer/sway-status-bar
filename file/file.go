@@ -1,7 +1,9 @@
 package file
 
 import (
+	"bytes"
 	"math"
+	"os"
 	"sway_status_bar/utils"
 	"time"
 )
@@ -37,5 +39,23 @@ func (u *FileNumUnitNonZero) Update(iter int64) error {
 		u.LastNonZeroAt = time.Now()
 	}
 	u.Num = int64(math.Round(float64(val) / u.Denum))
+	return nil
+}
+
+type FileContentUnit struct {
+	FPath   string
+	Trim    bool
+	Content string
+}
+
+func (u *FileContentUnit) Update(iter int64) error {
+	buf, err := os.ReadFile(u.FPath)
+	if err != nil {
+		return err
+	}
+	if u.Trim {
+		buf = bytes.TrimSpace(buf)
+	}
+	u.Content = string(buf)
 	return nil
 }

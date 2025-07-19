@@ -27,7 +27,8 @@ var ssdSamsungNANDTempFPath1 = utils.FindTempInputByLabelSafe(ssdSamsungDirPath,
 
 // var chipsetTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone0/hwmon*", "acpitz", onError) + "/temp1_input"
 // var wifiTempFPath = utils.FindHwmonFileByNameSafe("/sys/devices/virtual/thermal/thermal_zone*/hwmon*", "iwlwifi_1", onError) + "/temp1_input"
-var batDirPath = "/sys/devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/device:08/PNP0C09:01/PNP0C0A:03/power_supply/BAT0"
+var batDirPath = "/sys/class/power_supply/BAT0"
+var acDirPath = "/sys/class/power_supply/AC0"
 
 var fansDirPath = utils.FindHwmonDirByNameSafe("/sys/devices/platform/asus-nb-wmi/hwmon/hwmon*", "asus", onError)
 
@@ -155,6 +156,7 @@ func main() {
 	batCapacity := &file.FileNumUnit{FPath: batDirPath + "/capacity", Denum: 1}
 	batMaxCapacity := &file.FileNumUnit{FPath: batDirPath + "/charge_control_end_threshold", Denum: 1}
 	batPowerNow := &file.FileNumUnitNonZero{FPath: batDirPath + "/power_now", Denum: 1000000}
+	acOnline := &file.FileNumUnit{FPath: acDirPath + "/online", Denum: 1}
 	diskStatKingston := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-KINGSTON_SKC3000D2048G_50026B76865102B9", onError)}
 	diskStatSamsung := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-Samsung_SSD_990_EVO_Plus_4TB_S7U8NJ0Y501696X", onError)}
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
@@ -162,7 +164,7 @@ func main() {
 		cpuTemp, ssdKingstonTemp, ssdSamsungControllerTemp, ssdSamsungNANDTemp, //chipsetTemp, wifiTemp,
 		cpuLoad, memory, nvidiaGPU, volume, nets,
 		cpuFanSpeed, gpuFanSpeed,
-		batCapacity, batMaxCapacity, batPowerNow,
+		batCapacity, batMaxCapacity, batPowerNow, acOnline,
 		diskStatKingston, diskStatSamsung, swayMsg}
 
 	renderBlocks := func() {
@@ -313,8 +315,10 @@ func main() {
 		if time.Since(batPowerNow.LastNonZeroAt) < 10*time.Second {
 			batPowerStr = fmt.Sprintf(" %2d%s", batPowerNow.Num, dim("W"))
 		}
-		pBlock("#a3609a", `"%s %d%s<span color='#BBB'>%d</span>%s%s%s"`,
-			batIcon, batCapacity.Num, pangoSubSeparator, batMaxCapacity.Num, dim("%"), batPowerStr, blockExtraRightPad)
+		batIsUrgent := acOnline.Num == 0
+		pBlock("#a3609a", `"%s %d%s<span color='#BBB'>%d</span>%s%s%s", "urgent":%t`,
+			batIcon, batCapacity.Num, pangoSubSeparator, batMaxCapacity.Num, dim("%"), batPowerStr, blockExtraRightPad,
+			batIsUrgent)
 
 		// Networks
 		for _, net := range nets.Networks {
