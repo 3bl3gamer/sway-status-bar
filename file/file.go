@@ -2,21 +2,29 @@ package file
 
 import (
 	"bytes"
+	"errors"
 	"math"
 	"os"
 	"sway_status_bar/utils"
+	"syscall"
 	"time"
 )
 
 type FileNumUnit struct {
-	FPath string
-	Num   int64
-	Denum float64
+	FPath      string
+	Num        int64
+	Denum      float64
+	SkipErrors []syscall.Errno
 }
 
 func (u *FileNumUnit) Update(iter int64) error {
 	val, err := utils.FileReadInt64(u.FPath)
 	if err != nil {
+		for _, skip := range u.SkipErrors {
+			if errors.Is(err, skip) {
+				return nil
+			}
+		}
 		return err
 	}
 	u.Num = int64(math.Round(float64(val) / u.Denum))
@@ -28,11 +36,17 @@ type FileNumUnitNonZero struct {
 	Num           int64
 	Denum         float64
 	LastNonZeroAt time.Time
+	SkipErrors    []syscall.Errno
 }
 
 func (u *FileNumUnitNonZero) Update(iter int64) error {
 	val, err := utils.FileReadInt64(u.FPath)
 	if err != nil {
+		for _, skip := range u.SkipErrors {
+			if errors.Is(err, skip) {
+				return nil
+			}
+		}
 		return err
 	}
 	if val != 0 {

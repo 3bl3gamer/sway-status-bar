@@ -14,6 +14,7 @@ import (
 	"sway_status_bar/swaymsg"
 	"sway_status_bar/utils"
 	"sway_status_bar/volume"
+	"syscall"
 	"time"
 )
 
@@ -153,10 +154,13 @@ func main() {
 		return name == "lo" || strings.HasPrefix(name, "docker") ||
 			strings.HasPrefix(name, "br-") || strings.HasPrefix(name, "veth")
 	}}
-	batCapacity := &file.FileNumUnit{FPath: batDirPath + "/capacity", Denum: 1}
+
+	// after recent update it started returning ENODEV from time to time. ACPI glitch?
+	batCapacity := &file.FileNumUnit{FPath: batDirPath + "/capacity", Denum: 1, SkipErrors: []syscall.Errno{syscall.ENODEV}}
 	batMaxCapacity := &file.FileNumUnit{FPath: batDirPath + "/charge_control_end_threshold", Denum: 1}
-	batPowerNow := &file.FileNumUnitNonZero{FPath: batDirPath + "/power_now", Denum: 1000000}
+	batPowerNow := &file.FileNumUnitNonZero{FPath: batDirPath + "/power_now", Denum: 1000000, SkipErrors: []syscall.Errno{syscall.ENODEV}}
 	acOnline := &file.FileNumUnit{FPath: acDirPath + "/online", Denum: 1}
+
 	diskStatKingston := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-KINGSTON_SKC3000D2048G_50026B76865102B9", onError)}
 	diskStatSamsung := &diskstats.DiskStatUnit{DevName: utils.FindDevNameByIDSafe("nvme-Samsung_SSD_990_EVO_Plus_4TB_S7U8NJ0Y501696X", onError)}
 	swayMsg := &swaymsg.SwayMsgMonitorUnit{Events: []string{"window", "input"}, OnEvent: onEvent}
